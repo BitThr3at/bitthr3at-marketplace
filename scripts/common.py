@@ -1,7 +1,12 @@
 """Shared non-destructive project persistence helpers (POSIX, Python 3.9+)."""
 import json
+import fcntl
+import hashlib
 import os
+import shlex
 import sys
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,10 +37,14 @@ def payload() -> dict:
 
 
 def project_root(data=None, explicit=None) -> Path:
-    raw = explicit or (data or {}).get("cwd") or os.getcwd()
+    raw = explicit or os.environ.get("CLAUDE_PROJECT_DIR") or (data or {}).get("cwd") or os.getcwd()
     root = Path(raw).resolve(strict=True)
     if not root.is_dir():
         raise ValueError("project root must be a directory")
+    if not explicit and not os.environ.get("CLAUDE_PROJECT_DIR"):
+        for parent in (root, *root.parents):
+            if (parent / ".claude/AGENT_STATE.md").is_file():
+                return parent
     return root
 
 
@@ -61,7 +70,60 @@ def initialize(root: Path) -> None:
             stream.write(content)
 
 
-def instructions(root: Path) -> str:
+@contextmanager
+def locked(root: Path, relative: str):
+    fd = os.open(checked_path(root, relative), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "r+") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        yield
+
+
+def atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
+    fd, name = tempfile.mkstemp(prefix=".checkpoint-", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.fchmod(stream.fileno(), mode)
+        os.replace(temporary, path)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def fingerprint(root: Path) -> str:
+    digest = hashlib.sha256()
+    for relative in (".claude/AGENT_STATE.md", "discoveries.jsonl"):
+        digest.update(relative.encode())
+        with checked_path(root, relative).open("rb") as stream:
+            for block in iter(lambda: stream.read(65536), b""):
+                digest.update(block)
+    return digest.hexdigest()
+
+
+def append_log(root: Path, message: str, limit: int = 65536) -> None:
+    with locked(root, ".claude/checkpoint-log.lock"):
+        path = checked_path(root, ".claude/checkpoint.log")
+        line = (timestamp() + " " + message + "\n").encode()
+        if path.exists() and path.stat().st_size + len(line) > limit:
+            os.replace(path, checked_path(root, ".claude/checkpoint.log.1"))
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(line)
+            stream.flush()
+
+
+def instructions(root: Path, session_id: str = "default") -> str:
+    scripts = Path(__file__).resolve().parent
+    ledger = "python3 " + shlex.quote(str(scripts / "discovery.py")) + " --project " + shlex.quote(str(root))
+    state = "python3 " + shlex.quote(str(scripts / "state.py")) + " --project " + shlex.quote(str(root))
     return (
         f"Persistent project checkpoint: {root / '.claude/AGENT_STATE.md'}\n"
         f"Append-only discovery ledger: {root / 'discoveries.jsonl'}\n"
@@ -73,7 +135,19 @@ def instructions(root: Path) -> str:
         "Preserve confirmed discoveries; explicitly mark corrections/supersession with reasons. "
         "Record identities only when explicitly provided; never persist passwords, tokens, or raw secrets. "
         "Blocked actions do not authorize bypassing model restrictions; continue other permitted work. "
-        "Maintain a concise Resume point for a fresh session."
+        "Maintain a concise Resume point for a fresh session.\n"
+        f"Append significant records through the locked validator: {ledger} add "
+        "--type observation --status confirmed --summary 'Evidence-backed observation' "
+        "--evidence evidence/path.txt --confidence confirmed (choose appropriate fields).\n"
+        f"Read state and its SHA-256 revision using: {state} read\n"
+        "Append ledger records first. Write the revised full Markdown to a separate draft file, "
+        "then save it atomically using the SHA-256 returned by read:\n"
+        f"{state} update --expected-sha256 <revision> --file <draft-path> "
+        f"--session-id {shlex.quote(session_id)}\n"
+        "Do not edit AGENT_STATE.md or append the ledger directly. If a revision conflict occurs, "
+        "reread and merge your changes into the current state. A backup preserves the prior state. "
+        "If nothing changed, acknowledge without rewriting: "
+        f"{state} acknowledge --session-id {shlex.quote(session_id)}"
     )
 
 

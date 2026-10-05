@@ -4,5 +4,8 @@ AGENT.md
 .DS_Store
 .claude/AGENT_STATE.md
 .claude/checkpoint.log
+.claude/checkpoint.log.1
+.claude/checkpoint-*
+.claude/AGENT_STATE.md.bak
 discoveries.jsonl
 evidence/

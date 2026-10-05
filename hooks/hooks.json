@@ -1,6 +1,7 @@
 {
   "hooks": {
     "SessionStart": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/session_start.py\"", "timeout": 10}]}],
-    "Stop": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/checkpoint.py\"", "timeout": 10}]}]
+    "Stop": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/checkpoint.py\"", "timeout": 10}]}],
+    "PostToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/post_tool.py\"", "timeout": 10}]}]
   }
 }
