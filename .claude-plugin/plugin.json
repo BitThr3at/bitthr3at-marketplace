@@ -1,0 +1,7 @@
+{
+  "name": "pt-checkpoint",
+  "version": "1.0.0",
+  "description": "Persistent checkpointing and state handoff for long-running Claude Code technical assessments",
+  "author": {"name": "bitthr3at"},
+  "license": "MIT"
+}

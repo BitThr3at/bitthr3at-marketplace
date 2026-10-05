@@ -1,0 +1,8 @@
+__pycache__/
+AGENT.md
+*.py[cod]
+.DS_Store
+.claude/AGENT_STATE.md
+.claude/checkpoint.log
+discoveries.jsonl
+evidence/

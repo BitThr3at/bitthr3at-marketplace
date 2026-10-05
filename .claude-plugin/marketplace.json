@@ -1,0 +1,6 @@
+{
+  "name": "bitthr3at-marketplace",
+  "metadata": {"description": "Claude Code plugins by bitthr3at"},
+  "owner": {"name": "bitthr3at"},
+  "plugins": [{"name": "pt-checkpoint", "source": "./", "description": "Persistent project checkpointing"}]
+}

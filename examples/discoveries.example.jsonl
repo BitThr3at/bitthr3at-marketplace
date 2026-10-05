@@ -1,0 +1,1 @@
+{"id":"D-000001","timestamp":"2026-10-05T12:00:00Z","type":"endpoint","status":"confirmed","target":"example.com","value":"/api/v2/profile","summary":"Endpoint documented in synthetic example","evidence":["evidence/profile-response.txt"],"confidence":"confirmed","source":"synthetic-example","metadata":{}}

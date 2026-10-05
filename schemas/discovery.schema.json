@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Discovery record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "timestamp",
+    "type",
+    "status",
+    "target",
+    "value",
+    "summary",
+    "evidence",
+    "confidence",
+    "source",
+    "metadata"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[DTB]-[0-9]{6,}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "type": {
+      "enum": [
+        "endpoint",
+        "parameter",
+        "authentication",
+        "authorization",
+        "header",
+        "cookie",
+        "technology",
+        "observation",
+        "test",
+        "finding-candidate",
+        "negative-result",
+        "evidence",
+        "scope",
+        "other"
+      ]
+    },
+    "status": {
+      "enum": [
+        "confirmed",
+        "hypothesis",
+        "tested",
+        "negative-result",
+        "blocked",
+        "skipped",
+        "superseded"
+      ]
+    },
+    "target": {
+      "type": "string"
+    },
+    "value": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "\\S"
+      }
+    },
+    "confidence": {
+      "enum": [
+        "confirmed",
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
