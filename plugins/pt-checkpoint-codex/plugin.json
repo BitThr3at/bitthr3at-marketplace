@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pt-checkpoint-codex",
+  "version": "1.2.0",
+  "description": "Persistent project checkpoints and evidence handoffs for Codex",
+  "author": {"name": "bitthr3at"},
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "PT Checkpoint for Codex",
+        "shortDescription": "Persistent project checkpoints",
+        "developerName": "bitthr3at",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": "Save or resume this project's persistent checkpoint."
+      }
+    }
+  }
+}

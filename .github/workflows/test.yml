@@ -23,3 +23,6 @@ jobs:
       - run: claude plugin validate --strict .claude-plugin/plugin.json
       - run: claude plugin validate --strict .claude-plugin/marketplace.json
       - run: claude plugin validate --strict commands
+      - run: npm install -g @openai/codex@0.160.0
+      - run: codex plugin marketplace add "$GITHUB_WORKSPACE"
+      - run: codex plugin add pt-checkpoint-codex@bitthr3at-marketplace

@@ -1,17 +1,40 @@
 # PT Checkpoint
 
-A Claude Code plugin for persistent project state across fresh sessions.
+A marketplace with separate checkpoint plugins for Claude Code and Codex:
+`pt-checkpoint` and `pt-checkpoint-codex`. Both use the same project state files.
 SessionStart creates state files without overwriting existing content and tells
 Claude to read prior state. A manual command consolidates progress. Stop requests
 consolidation after recorded changes, guarded against recursive or duplicate reminders.
-The scripts never infer discoveries from transcripts: Claude writes the summary
+The scripts never infer discoveries from transcripts: the model writes the summary
 and explicitly appends evidence-backed records.
 
-Requires Python 3.9+, macOS or Linux (POSIX `flock`), and Claude Code 2.1.289+
-(including Stop context feedback and project-path substitution). Runtime
+Requires Python 3.9+, macOS or Linux (POSIX `flock`). The Claude plugin targets
+Claude Code 2.1.289+; the Codex package targets command-hook-capable Codex versions
+(CLI packaging tested with 0.160.0). Runtime
 uses only Python's standard library, with no network calls or telemetry.
 
 ## Install
+
+### Codex
+
+```bash
+codex plugin marketplace add BitThr3at/bitthr3at-marketplace
+codex plugin add pt-checkpoint-codex@bitthr3at-marketplace
+codex plugin list --marketplace bitthr3at-marketplace
+```
+
+For local development, replace the GitHub source in the first command with the
+absolute path to this checkout. Restart Codex and review/trust the plugin hooks
+in `/hooks`. Installing the plugin does not automatically trust its hooks.
+Invoke its manual checkpoint skill with `$pt-checkpoint`.
+
+The Codex package lives in `plugins/pt-checkpoint-codex/`; its registry is
+`.agents/plugins/marketplace.json`. Claude's registry remains
+`.claude-plugin/marketplace.json` and lists `pt-checkpoint`. See the
+[Codex package guide](plugins/pt-checkpoint-codex/README.md) for details and the
+[official hook guide](https://learn.chatgpt.com/docs/hooks) for trust review.
+
+### Claude Code
 
 For local development, without changing installed plugins:
 
@@ -49,7 +72,8 @@ version for hosted releases. Installation follows the official
 
 ## Use
 
-Start `claude` in the authorized project directory. It creates:
+Start `claude` or `codex` in the authorized project directory with the respective
+plugin installed and its hooks available/trusted. It creates:
 
 - `.claude/AGENT_STATE.md`: compact current checkpoint.
 - `discoveries.jsonl`: append-only discovery history.
@@ -60,15 +84,18 @@ Start `claude` in the authorized project directory. It creates:
 
 Run `/pt-checkpoint:checkpoint` after meaningful progress. Claude plugin
 commands are namespaced; `/checkpoint` alone is not the guaranteed plugin command.
-Close Claude and start a fresh session in the same directory to resume. Hooks
+In Codex, invoke the `pt-checkpoint` skill with `$pt-checkpoint`.
+Close the agent and start a fresh session in the same directory to resume. Hooks
 inject file paths and instructions, not file contents; Claude must read the state
 before continuing. Checkpoint completion depends on Claude successfully writing
 the files. Abrupt process termination may prevent the Stop hook from running.
 
-`Stop` fires when Claude finishes a response, not only when the process exits.
-It emits `hookSpecificOutput.additionalContext` to request consolidation and returns
+`Stop` fires when the model finishes a response, not only when the process exits.
+Claude's hook emits `hookSpecificOutput.additionalContext`; Codex's emits its
+`decision: block` continuation request. Both return
 silently when `stop_hook_active` is true. The PostToolUse hook silently tracks
 successful Write/Edit/MultiEdit calls in the pinned project; it emits no context.
+Codex's adapter instead tracks paths from its `apply_patch` tool inputs.
 Stop also detects changed state/ledger contents. It suppresses idle and duplicate
 reminders. It does not detect Bash-only changes to other files or changes confined
 to external services; use the manual command for those workflows.
@@ -80,8 +107,10 @@ The hook requests work rather than proving Claude completed it. The state utilit
 records successful saves or explicit acknowledgments. Logs rotate at 64 KiB,
 retaining one previous segment as `.claude/checkpoint.log.1`.
 
-Project location is pinned using Claude Code's `CLAUDE_PROJECT_DIR`, which stays
-stable across directory/worktree changes. Explicit CLI `--project` overrides it.
+Claude's project location is pinned using `CLAUDE_PROJECT_DIR`, which stays
+stable across directory/worktree changes. Codex pins the first SessionStart's
+project in its host-provided plugin data directory and reuses it for that session.
+`PT_CHECKPOINT_PROJECT_DIR` provides an explicit hook override. CLI `--project` overrides it.
 Outside Claude, the CLI finds the nearest ancestor with a checkpoint before
 falling back to the working directory. Worktrees share the session's starting
 project checkpoint; use `--project` to intentionally select an independent one.
@@ -160,7 +189,8 @@ Do not store passwords, tokens, or raw secrets. Files newly created by the scrip
 use private permissions; existing permissions are preserved. Examples are synthetic.
 The plugin does not expand authorization, bypass Claude safety behavior, or
 guarantee a later model will perform a blocked action. Record blocked/skipped work
-and continue other permitted tasks. It never modifies project `CLAUDE.md`.
+and continue other permitted tasks. Neither plugin modifies project `CLAUDE.md`
+or `AGENTS.md`, nor installs its own trust or permission exceptions.
 
 ## Troubleshooting and verification
 
@@ -199,3 +229,22 @@ Normal tests and CI skip live model calls. They cover hooks, file persistence,
 directory changes, concurrent writes, and revision conflicts; they do not prove
 model compliance or remote GitHub installation. CI also validates manifests and
 commands strictly with a pinned Claude Code CLI version.
+CI also checks Codex marketplace discovery and local installation with a pinned
+Codex CLI version, without starting model sessions or automatically trusting hooks.
+
+## Maintaining both packages
+
+The Claude plugin currently remains at the repository root. Its canonical Python
+utilities are in `scripts/`. The separate Codex plugin is self-contained: it
+contains generated copies of those utilities and its own manifest, hooks, and skill.
+After editing shared runtime code, run:
+
+```bash
+python3 scripts/build_codex.py
+python3 -m unittest discover -s tests -v
+```
+
+Commit the rebuilt package files. Tests compare their bytes to canonical sources
+and cover both hook contracts. This avoids installing a plugin that imports files
+outside its package. Codex prefixes its reminder session IDs to avoid mixing host
+bookkeeping while the discovery ledger and Markdown state remain shared.

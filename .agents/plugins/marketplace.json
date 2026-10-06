@@ -1,0 +1,10 @@
+{
+  "name": "bitthr3at-marketplace",
+  "interface": {"displayName": "BitThr3at Marketplace"},
+  "plugins": [{
+    "name": "pt-checkpoint-codex",
+    "source": {"source": "local", "path": "./plugins/pt-checkpoint-codex"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Productivity"
+  }]
+}
